@@ -36,7 +36,7 @@ import logging
 from .OBDResponse import OBDResponse
 from .__version__ import __version__
 from .commands import commands
-from .elm327 import ELM327
+from .elm327 import ELM327, ELM327log, ELM327replay
 from .protocols import ECU_HEADER
 from .utils import scan_serial, OBDStatus
 
@@ -50,7 +50,9 @@ class OBD(object):
     """
 
     def __init__(self, portstr=None, baudrate=None, protocol=None, fast=True,
-                 timeout=0.1, check_voltage=True, start_low_power=False):
+                 timeout=0.1, check_voltage=True, start_low_power=False,
+                 interface_class=ELM327):
+        self.interface_class = interface_class
         self.interface = None
         self.supported_commands = set(commands.base_commands())
         self.fast = fast  # global switch for disabling optimizations
@@ -82,7 +84,7 @@ class OBD(object):
 
             for port in port_names:
                 logger.info("Attempting to use port: " + str(port))
-                self.interface = ELM327(port, baudrate, protocol,
+                self.interface = self.interface_class(port, baudrate, protocol,
                                         self.timeout, check_voltage,
                                         start_low_power)
 
@@ -90,7 +92,7 @@ class OBD(object):
                     break  # success! stop searching for serial
         else:
             logger.info("Explicit port defined")
-            self.interface = ELM327(portstr, baudrate, protocol,
+            self.interface = self.interface_class(portstr, baudrate, protocol,
                                     self.timeout, check_voltage,
                                     start_low_power)
 

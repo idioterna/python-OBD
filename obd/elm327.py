@@ -34,6 +34,8 @@ import re
 import serial
 import time
 import logging
+import json
+import os
 from .protocols import *
 from .utils import OBDStatus
 
@@ -507,7 +509,7 @@ class ELM327:
                 self.__status = OBDStatus.NOT_CONNECTED
                 self.__port.close()
                 self.__port = None
-                logger.critical("Device disconnected while writing")
+                logger.exception("Error while writing")
                 return
         else:
             logger.info("cannot perform __write() when unconnected")
@@ -533,7 +535,7 @@ class ELM327:
                 self.__status = OBDStatus.NOT_CONNECTED
                 self.__port.close()
                 self.__port = None
-                logger.critical("Device disconnected while reading")
+                logger.exception("Error while reading device")
                 return []
 
             # if nothing was received
@@ -565,3 +567,39 @@ class ELM327:
         lines = [s.strip() for s in re.split("[\r\n]", string) if bool(s)]
 
         return lines
+
+
+class ELM327log(ELM327):
+        def __init__(self, portname, baudrate, protocol, timeout,
+                     check_voltage=True, start_low_power=False, filename=None):
+                self._filename = filename
+                super().__init__(portname, baudrate, protocol, timeout,
+                                 check_voltage=True, start_low_power=False)
+
+        def __read(self):
+                lines = super().__read()
+                f = open(self._filename, 'a+')
+                f.write(json.dumps(dict(timestamp=time.time(), lines=lines)) + '\n')
+                f.close()
+                return lines
+
+class ELM327replay(ELM327):
+        def __init__(self, portname, baudrate, protocol, timeout,
+                     check_voltage=True, start_low_power=False, filename=None):
+                self._fp = 0
+                if not os.path.isfile(filename):
+                        raise IOError("can't find " + repr(filename))
+                self._filename = filename
+                super().__init__(portname, baudrate, protocol, timeout,
+                                 check_voltage=True, start_low_power=False)
+
+        def __write(self, cmd):
+                return
+
+        def __read(self):
+                f = open(self._filename)
+                f.seek(fp)
+                lines = json.loads(f.readline().strip()).get('lines', [])
+                self._fp = f.tell()
+                return lines
+
